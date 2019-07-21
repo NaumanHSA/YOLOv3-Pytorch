@@ -1,0 +1,27 @@
+{
+  "lr": 0.0001,
+  "epochs": 15,
+  "batch_size": {
+    "train": 12
+  },
+  "input_size": {
+    "width": 416,
+    "height": 416
+  },
+  "bn_momentum": 0.01,
+  "gpu_devices": [
+    0
+  ],
+  "data_workers": {
+    "train": 3
+  },
+  "dataset_tags": {
+    "train": "train"
+  },
+  "subdivisions": {
+    "train": 1
+  },
+  "print_every_iter": 10,
+  "weights_init_type": "transfer_learning",
+  "enable_augmentations": false
+}
