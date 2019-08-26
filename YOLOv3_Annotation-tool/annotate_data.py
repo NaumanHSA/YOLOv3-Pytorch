@@ -1,6 +1,6 @@
 from __future__ import division
 from tkinter import *
-from tkinter import messagebox
+import tkinter.messagebox
 from PIL import Image, ImageTk
 from tkinter import ttk
 import os
@@ -40,7 +40,7 @@ class AnnotationTool():
 		self.classNames        = []
 		self.classContainer    = config.PARAMS['classNames']
 		self.imageFormat       = config.PARAMS['imageFormat']
-		self.sourceImageDir    = config.PARAMS['sourceImageDirectory']
+		self.sourceImageDir    = config.PARAMS['imageDirectory']
 		self.annotationDir     = config.PARAMS['annotationDirectory']
 
 		# initialize mouse state
@@ -116,11 +116,9 @@ class AnnotationTool():
 		# control panel for image navigation
 		self.ctrPanel = Frame(self.frame)
 		self.ctrPanel.grid(row=7, column=1, columnspan=2, sticky=W + E)
-		self.prevBtn = Button(self.ctrPanel, text='<< Prev',
-							  width=10, command=self.prevImage)
+		self.prevBtn = Button(self.ctrPanel, text='<< Prev', width=10, command=self.prevImage)
 		self.prevBtn.pack(side=LEFT, padx=5, pady=3)
-		self.nextBtn = Button(self.ctrPanel, text='Next >>',
-							  width=10, command=self.nextImage)
+		self.nextBtn = Button(self.ctrPanel, text='Next >>', width=10, command=self.nextImage)
 		self.nextBtn.pack(side=LEFT, padx=5, pady=3)
 		self.progLabel = Label(self.ctrPanel, text="Progress:     /    ")
 		self.progLabel.pack(side=LEFT, padx=5)
@@ -140,7 +138,7 @@ class AnnotationTool():
 
 	def addClass(self):
 		className = self.classEntry.get()
-		print ("add class : ", className)
+		print("add class : ", className)
 		if className:
 			self.classNames.append(className)
 		if self.classNames:
@@ -153,37 +151,29 @@ class AnnotationTool():
 		if not dbg:
 			s = self.entry.get()
 			self.parent.focus()
-			self.category = int(s)
+			self.category = s
 
-		self.imageDir = os.path.join(
-			self.sourceImageDir, '%03d' % (self.category))
+		# self.imageDir = os.path.join(self.sourceImageDir, '%03d' % (self.category))
+		self.imageDir = os.path.join(self.sourceImageDir, s)
+
 		if not os.path.exists(self.imageDir):
-			print ("No such directory present : ", self.imageDir)
+			print("No such directory present : ", self.imageDir)
 			return
 
-		if self.imageFormat == "PNG":
-			self.imageList = glob.glob(os.path.join(self.imageDir, '*.png'))
-			if len(self.imageList) == 0:
-				print ('No .png images found in the specified dir!')
-				return
-		elif self.imageFormat == "JPEG":
-			self.imageList = glob.glob(os.path.join(self.imageDir, '*.jpeg'))
-			if len(self.imageList) == 0:
-				print ('No .jpeg images found in the specified dir!')
-				return
-		else:
-			self.imageList = glob.glob(os.path.join(self.imageDir, '*.jpg'))
-			if len(self.imageList) == 0:
-				print ('No .jpg images found in the specified dir!')
-				return
+		for format in self.imageFormat:
+			for file in glob.glob(os.path.join(self.imageDir, ('*.' + format))):
+				self.imageList.append(file)
+
+		if len(self.imageList) == 0:
+			print('No images found in the specified dir!')
+			return
 
 		# default to the 1st image in the collection
 		self.cur = 1
 		self.total = len(self.imageList)
 
 		# set up output dir
-		self.outDir = os.path.join(
-			self.annotationDir, '%03d' % (self.category))
+		self.outDir = os.path.join(self.annotationDir, s)
 		if not os.path.exists(self.outDir):
 			os.mkdir(self.outDir)
 
@@ -209,12 +199,27 @@ class AnnotationTool():
 		if os.path.exists(self.labelfilename):
 			with open(self.labelfilename) as f:
 				for (i, line) in enumerate(f):
-					if i == 0:
-						bbox_cnt = int(line.strip())
-						continue
-					# tmp = [int(t.strip()) for t in line.split()]
-					tmp = line.split()
-					self.bboxList.append(tuple(tmp))
+
+					elems = line.split(' ')
+					print("Line : ", line, " \n")
+					c = elems[0]
+					x_norm = float(elems[1])
+					y_norm = float(elems[2])
+					w_norm = float(elems[3])
+					h_norm = float(elems[4])
+
+					img_width = self.img.size[0]
+					img_height = self.img.size[1]
+
+					x_max = int((x_norm * img_width) + ((w_norm * img_width) / 2))
+					x_min = int(x_max - (w_norm * img_width))
+					y_max = int((y_norm * img_height) + ((h_norm * img_height) / 2))
+					y_min = int(y_max - (h_norm * img_height))
+
+					tmp = (str(x_min) + ' ' + str(y_min) + ' ' + str(x_max) + ' ' + str(y_max) + ' ' + c).split()
+					temp = [c , str(x_norm), str(y_norm), str(w_norm), str(h_norm)]
+
+					self.bboxList.append(tuple(temp))
 					tmpId = self.mainPanel.create_rectangle(int(tmp[0]), int(tmp[1]),
 															int(tmp[2]), int(
 																tmp[3]),
@@ -230,7 +235,6 @@ class AnnotationTool():
 	def saveImage(self):
 		if self.labelfilename:
 			with open(self.labelfilename, 'w') as f:
-				f.write('%d\n' % len(self.bboxList))
 				for bbox in self.bboxList:
 					f.write(' '.join(map(str, bbox)) + '\n')
 			print ('Image No. %d saved' % (self.cur))
@@ -244,7 +248,20 @@ class AnnotationTool():
 				self.STATE['x'], event.x)
 			y1, y2 = min(self.STATE['y'], event.y), max(
 				self.STATE['y'], event.y)
-			self.bboxList.append((x1, y1, x2, y2, self.currentLabelclass))
+
+			dw = 1. / self.img.size[0]
+			dh = 1. / self.img.size[1]
+			x = (x1 + x2) / 2.0
+			y = (y1 + y2) / 2.0
+			w = x2 - x1
+			h = y2 - y1
+			x = x * dw
+			y = y * dh
+			w = w * dw
+			h = h * dh
+
+			self.bboxList.append((self.currentLabelclass, x, y, w, h))
+
 			self.bboxIdList.append(self.bboxId)
 			self.bboxId = None
 			self.listbox.insert(END, '%s : (%d, %d) -> (%d, %d)' %
